@@ -6,6 +6,7 @@ convert_result() {
     local output_file="$2"
     local append_mode="${3:-false}"
     local max_count="${4:-0}"
+    local region_tag="${5:-}"
     local enable_download="${CFST_ENABLE_DOWNLOAD:-true}"
     local port="${CFST_PORT:-443}"
     local tmp_rank
@@ -35,14 +36,18 @@ convert_result() {
             {
                 ip = trim($1); delay = trim($5); speed = trim($6); region = trim($7);
                 if (ip == "" || delay == "" || speed == "") next;
-                if (region == "" || region == "N/A") region = "N/A";
+                if (tag != "") {
+                    region = tag;
+                } else if (region == "" || region == "N/A") {
+                    region = "N/A";
+                }
                 d = delay + 0; s = speed + 0;
                 score = (s * 1000.0) / (d + 1.0);
                 ip_port = (index(ip, ":") > 0) ? ("[" ip "]:" port) : (ip ":" port);
                 line = sprintf("%s#%s-%sms-%sM/s", ip_port, region, delay, speed);
                 printf("%.6f\t%s\n", score, line);
             }
-        ' port="$port" "$csv_file" | sort -t $'\t' -k1,1nr > "$tmp_rank"
+        ' port="$port" tag="$region_tag" "$csv_file" | sort -t $'\t' -k1,1nr > "$tmp_rank"
     else
         # 未开启下载测速时，仅按延迟从低到高选取。
         awk -F',' '
@@ -52,13 +57,17 @@ convert_result() {
             {
                 ip = trim($1); delay = trim($5); region = trim($7);
                 if (ip == "" || delay == "") next;
-                if (region == "" || region == "N/A") region = "N/A";
+                if (tag != "") {
+                    region = tag;
+                } else if (region == "" || region == "N/A") {
+                    region = "N/A";
+                }
                 d = delay + 0;
                 ip_port = (index(ip, ":") > 0) ? ("[" ip "]:" port) : (ip ":" port);
                 line = sprintf("%s#%s-%sms", ip_port, region, delay);
                 printf("%.6f\t%s\n", d, line);
             }
-        ' port="$port" "$csv_file" | sort -t $'\t' -k1,1n > "$tmp_rank"
+        ' port="$port" tag="$region_tag" "$csv_file" | sort -t $'\t' -k1,1n > "$tmp_rank"
     fi
 
     if [[ "$max_count" =~ ^[0-9]+$ ]] && [[ "$max_count" -gt 0 ]]; then
