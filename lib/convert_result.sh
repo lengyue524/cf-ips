@@ -7,6 +7,8 @@ convert_result() {
     local append_mode="${3:-false}"
     local max_count="${4:-0}"
     local enable_download="${CFST_ENABLE_DOWNLOAD:-true}"
+    local tmp_rank
+    local tmp_selected
     local line_count=0
 
     if [[ ! -f "$csv_file" ]]; then
@@ -18,33 +20,54 @@ convert_result() {
         : > "$output_file"
     fi
 
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        if [[ "$max_count" =~ ^[0-9]+$ ]] && [[ "$max_count" -gt 0 ]] && [[ "$line_count" -ge "$max_count" ]]; then
-            break
-        fi
+    tmp_rank="${output_file}.rank.$$"
+    tmp_selected="${output_file}.selected.$$"
 
-        # 跳过表头
-        [[ "$line" == *"IP 地址"* || "$line" == *"IP,"* ]] && continue
-        [[ -z "$line" ]] && continue
+    if [[ "${enable_download}" == "true" || "${enable_download}" == "1" ]]; then
+        # 下载测速开启时，按综合分数排序：
+        # score = speed * 1000 / (delay + 1)
+        # 分数越高表示下载速度更快且延迟更低。
+        awk -F',' '
+            function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+            NR == 1 { next }
+            NF < 7 { next }
+            {
+                ip = trim($1); delay = trim($5); speed = trim($6); region = trim($7);
+                if (ip == "" || delay == "" || speed == "") next;
+                if (region == "" || region == "N/A") region = "N/A";
+                d = delay + 0; s = speed + 0;
+                score = (s * 1000.0) / (d + 1.0);
+                line = sprintf("%s#%s-%sms-%sM/s", ip, region, delay, speed);
+                printf("%.6f\t%s\n", score, line);
+            }
+        ' "$csv_file" | sort -t $'\t' -k1,1nr > "$tmp_rank"
+    else
+        # 未开启下载测速时，仅按延迟从低到高选取。
+        awk -F',' '
+            function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+            NR == 1 { next }
+            NF < 7 { next }
+            {
+                ip = trim($1); delay = trim($5); region = trim($7);
+                if (ip == "" || delay == "") next;
+                if (region == "" || region == "N/A") region = "N/A";
+                d = delay + 0;
+                line = sprintf("%s#%s-%sms", ip, region, delay);
+                printf("%.6f\t%s\n", d, line);
+            }
+        ' "$csv_file" | sort -t $'\t' -k1,1n > "$tmp_rank"
+    fi
 
-        local ip sent recv loss delay speed region
-        IFS=',' read -r ip sent recv loss delay speed region <<< "$line"
+    if [[ "$max_count" =~ ^[0-9]+$ ]] && [[ "$max_count" -gt 0 ]]; then
+        awk -F'\t' 'NR <= max { print $2 }' max="$max_count" "$tmp_rank" > "$tmp_selected"
+    else
+        awk -F'\t' '{ print $2 }' "$tmp_rank" > "$tmp_selected"
+    fi
 
-        ip="$(echo "$ip" | xargs)"
-        delay="$(echo "$delay" | xargs)"
-        speed="$(echo "$speed" | xargs)"
-        region="$(echo "$region" | xargs)"
+    cat "$tmp_selected" >> "$output_file"
+    line_count="$(awk 'END {print NR+0}' "$tmp_selected")"
 
-        [[ -z "$ip" ]] && continue
-        [[ -z "$region" || "$region" == "N/A" ]] && region="N/A"
-
-        if [[ "${enable_download}" == "true" || "${enable_download}" == "1" ]]; then
-            printf '%s#%s-%sms-%sM/s\n' "$ip" "$region" "$delay" "$speed" >> "$output_file"
-        else
-            printf '%s#%s-%sms\n' "$ip" "$region" "$delay" >> "$output_file"
-        fi
-        ((line_count++)) || true
-    done < "$csv_file"
+    rm -f "$tmp_rank" "$tmp_selected"
 
     echo "[CONVERT] 已写入 ${line_count} 条记录 -> ${output_file}"
     CFST_RESULT_COUNT=$line_count
