@@ -76,8 +76,10 @@ build_cfst_args() {
     local ip_count="$3"
     local colo="$4"
     local enable_download="${CFST_ENABLE_DOWNLOAD:-true}"
+    local test_port="${CFST_PORT:-443}"
 
     _args=(-f "${CFST_BIN_DIR}/ip.txt" -o "$csv_file")
+    _args+=(-tp "$test_port")
 
     if [[ "${enable_download}" == "true" || "${enable_download}" == "1" ]]; then
         _args+=(-p 0 -dn "$ip_count")

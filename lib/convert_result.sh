@@ -7,6 +7,7 @@ convert_result() {
     local append_mode="${3:-false}"
     local max_count="${4:-0}"
     local enable_download="${CFST_ENABLE_DOWNLOAD:-true}"
+    local port="${CFST_PORT:-443}"
     local tmp_rank
     local tmp_selected
     local line_count=0
@@ -37,10 +38,11 @@ convert_result() {
                 if (region == "" || region == "N/A") region = "N/A";
                 d = delay + 0; s = speed + 0;
                 score = (s * 1000.0) / (d + 1.0);
-                line = sprintf("%s#%s-%sms-%sM/s", ip, region, delay, speed);
+                ip_port = (index(ip, ":") > 0) ? ("[" ip "]:" port) : (ip ":" port);
+                line = sprintf("%s#%s-%sms-%sM/s", ip_port, region, delay, speed);
                 printf("%.6f\t%s\n", score, line);
             }
-        ' "$csv_file" | sort -t $'\t' -k1,1nr > "$tmp_rank"
+        ' port="$port" "$csv_file" | sort -t $'\t' -k1,1nr > "$tmp_rank"
     else
         # 未开启下载测速时，仅按延迟从低到高选取。
         awk -F',' '
@@ -52,10 +54,11 @@ convert_result() {
                 if (ip == "" || delay == "") next;
                 if (region == "" || region == "N/A") region = "N/A";
                 d = delay + 0;
-                line = sprintf("%s#%s-%sms", ip, region, delay);
+                ip_port = (index(ip, ":") > 0) ? ("[" ip "]:" port) : (ip ":" port);
+                line = sprintf("%s#%s-%sms", ip_port, region, delay);
                 printf("%.6f\t%s\n", d, line);
             }
-        ' "$csv_file" | sort -t $'\t' -k1,1n > "$tmp_rank"
+        ' port="$port" "$csv_file" | sort -t $'\t' -k1,1n > "$tmp_rank"
     fi
 
     if [[ "$max_count" =~ ^[0-9]+$ ]] && [[ "$max_count" -gt 0 ]]; then
