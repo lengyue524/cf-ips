@@ -58,6 +58,7 @@ main() {
 
     export CFST_WORK_DIR
     export CFST_BIN_DIR="${CFST_WORK_DIR}/.cfst"
+    mkdir -p "${CFST_WORK_DIR}" "${CFST_BIN_DIR}"
 
     local tmp_output="${CFST_BIN_DIR}/.converted.txt"
     local merged_output="${CFST_BIN_DIR}/.merged.txt"
