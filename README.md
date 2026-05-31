@@ -2,6 +2,11 @@
 
 在 [青龙面板](https://github.com/whyour/qinglong) 定时运行 [CloudflareSpeedTest](https://github.com/XIU2/CloudflareSpeedTest)，将优选 IP 写入文件并 push 到 GitHub。
 
+支持两种模式：
+
+- 单次模式：用 `CFST_COLO + CFST_IP_COUNT` 获取一组优选 IP
+- 分地区配额模式：分别配置香港/新加坡/美国/日本的数量后，脚本分地区测速并合并去重
+
 ## 输出格式
 
 启用下载测速：
@@ -50,6 +55,14 @@
 | `CFST_VERSION` | 否 | 固定版本如 `v2.3.5`；留空用 latest |
 | `CFST_COLO` | 否 | 地区码，如 `HKG,LAX,SEA`（需 HTTPing） |
 | `CFST_IP_COUNT` | 否 | 优选数量，默认 `10` |
+| `CFST_HK_COUNT` | 否 | 香港数量（>0 启用分地区模式） |
+| `CFST_HK_CODES` | 否 | 香港地区码，默认 `HKG` |
+| `CFST_SG_COUNT` | 否 | 新加坡数量 |
+| `CFST_SG_CODES` | 否 | 新加坡地区码，默认 `SIN` |
+| `CFST_US_COUNT` | 否 | 美国数量 |
+| `CFST_US_CODES` | 否 | 美国地区码列表，默认 `LAX,SEA,SJC` |
+| `CFST_JP_COUNT` | 否 | 日本数量 |
+| `CFST_JP_CODES` | 否 | 日本地区码列表，默认 `NRT,HND,KIX` |
 | `CFST_ENABLE_DOWNLOAD` | 否 | `true` / `false`，默认 `true` |
 | `CFST_DOWNLOAD_URL` | 否 | 自定义下载测速地址 |
 | `CFST_OUTPUT_FILE` | 否 | 输出文件名，默认 `cf_ips.txt` |
@@ -76,9 +89,21 @@ task cf-ips/cf_ips.sh
 ## 注意事项
 
 - `-cfcolo` 地区筛选仅在 HTTPing 模式下生效；设置 `CFST_COLO` 时脚本会自动加 `-httping`
+- 设置任意 `CFST_*_COUNT > 0` 后，脚本进入分地区配额模式并分别执行测速
 - 禁用下载测速且未设置地区时，地区码可能为 `N/A`
 - `.cfst/` 目录存放 CFST 二进制与临时文件，已加入 `.gitignore`
 - 服务器上 HTTPing 并发过高可能被限流，可在 CFST 上游文档中了解 `-n` 参数（本脚本使用默认值）
+
+## 分地区配额示例
+
+```bash
+CFST_HK_COUNT=5
+CFST_SG_COUNT=3
+CFST_US_COUNT=4
+CFST_JP_COUNT=3
+```
+
+上面的配置会按四个地区分别测速，最后合并为一个结果文件并按 IP 去重。
 
 ## 目录结构
 

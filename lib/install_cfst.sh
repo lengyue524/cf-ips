@@ -72,8 +72,9 @@ ensure_cfst() {
 
 build_cfst_args() {
     local -n _args=$1
-    local csv_file="${CFST_BIN_DIR}/result.csv"
-    local ip_count="${CFST_IP_COUNT:-10}"
+    local csv_file="$2"
+    local ip_count="$3"
+    local colo="$4"
     local enable_download="${CFST_ENABLE_DOWNLOAD:-true}"
 
     _args=(-f "${CFST_BIN_DIR}/ip.txt" -o "$csv_file")
@@ -84,18 +85,22 @@ build_cfst_args() {
         _args+=(-dd -p "$ip_count")
     fi
 
-    if [[ -n "${CFST_COLO}" ]]; then
+    if [[ -n "${colo}" ]]; then
+        _args+=(-httping -cfcolo "${colo}")
+    elif [[ -n "${CFST_COLO:-}" ]]; then
         _args+=(-httping -cfcolo "${CFST_COLO}")
     fi
 
-    if [[ -n "${CFST_DOWNLOAD_URL}" ]]; then
+    if [[ -n "${CFST_DOWNLOAD_URL:-}" ]]; then
         _args+=(-url "${CFST_DOWNLOAD_URL}")
     fi
 }
 
-run_cfst() {
+run_cfst_once() {
+    local colo="${1:-}"
+    local ip_count="${2:-${CFST_IP_COUNT:-10}}"
+    local csv_file="${3:-${CFST_BIN_DIR}/result.csv}"
     local -a args=()
-    local csv_file="${CFST_BIN_DIR}/result.csv"
 
     ensure_cfst || return 1
 
@@ -104,7 +109,7 @@ run_cfst() {
         return 1
     fi
 
-    build_cfst_args args
+    build_cfst_args args "$csv_file" "$ip_count" "$colo"
 
     echo "[CFST] 执行: ${CFST_BIN} ${args[*]}"
     rm -f "$csv_file"
@@ -118,4 +123,8 @@ run_cfst() {
 
     CFST_RESULT_CSV="$csv_file"
     export CFST_RESULT_CSV
+}
+
+run_cfst() {
+    run_cfst_once "${CFST_COLO:-}" "${CFST_IP_COUNT:-10}" "${CFST_BIN_DIR}/result.csv"
 }

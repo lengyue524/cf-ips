@@ -4,6 +4,7 @@
 convert_result() {
     local csv_file="$1"
     local output_file="$2"
+    local append_mode="${3:-false}"
     local enable_download="${CFST_ENABLE_DOWNLOAD:-true}"
     local line_count=0
 
@@ -12,7 +13,9 @@ convert_result() {
         return 1
     fi
 
-    : > "$output_file"
+    if [[ "$append_mode" != "true" ]]; then
+        : > "$output_file"
+    fi
 
     while IFS= read -r line || [[ -n "$line" ]]; do
         # 跳过表头
@@ -46,4 +49,11 @@ convert_result() {
         return 1
     fi
     return 0
+}
+
+dedupe_by_ip() {
+    local input_file="$1"
+    local output_file="$2"
+
+    awk -F'#' '!seen[$1]++' "$input_file" > "$output_file"
 }
