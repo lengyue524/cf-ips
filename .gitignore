@@ -1,3 +1,4 @@
 .cfst/
+.git-sync-repo/
 .env
 *.csv

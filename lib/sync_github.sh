@@ -32,40 +32,83 @@ EOF
 }
 
 verify_git_repo() {
-    if [[ ! -d "${CFST_WORK_DIR}/.git" ]]; then
-        echo "[GIT] 当前目录不是 git 仓库，请先在青龙中添加本仓库订阅" >&2
+    [[ -d "${CFST_WORK_DIR}/.git" ]]
+}
+
+normalize_repo_url() {
+    local repo="${GITHUB_REPO:-}"
+    if [[ -z "$repo" ]]; then
+        echo ""
+        return 0
+    fi
+    if [[ "$repo" != git@* && "$repo" != https://* ]]; then
+        repo="git@github.com:${repo}.git"
+    fi
+    echo "$repo"
+}
+
+prepare_push_repo() {
+    local branch="${GITHUB_BRANCH:-main}"
+    local repo_url
+    local sync_dir
+
+    if verify_git_repo; then
+        PUSH_REPO_DIR="${CFST_WORK_DIR}"
+        export PUSH_REPO_DIR
+        return 0
+    fi
+
+    repo_url="$(normalize_repo_url)"
+    if [[ -z "$repo_url" ]]; then
+        echo "[GIT] 当前目录无 .git，且未配置 GITHUB_REPO，无法 push" >&2
         return 1
     fi
+
+    sync_dir="${CFST_WORK_DIR}/.git-sync-repo"
+    if [[ ! -d "${sync_dir}/.git" ]]; then
+        echo "[GIT] 当前目录非仓库，开始克隆远程仓库到临时目录 ..."
+        git clone --branch "$branch" "$repo_url" "$sync_dir" || return 1
+    else
+        git -C "$sync_dir" remote set-url origin "$repo_url"
+        git -C "$sync_dir" fetch origin "$branch" || true
+        git -C "$sync_dir" checkout "$branch" || git -C "$sync_dir" checkout -b "$branch"
+        git -C "$sync_dir" pull --rebase origin "$branch" 2>/dev/null || true
+    fi
+
+    PUSH_REPO_DIR="$sync_dir"
+    export PUSH_REPO_DIR
 }
 
 push_result() {
     local output_file="$1"
     local branch="${GITHUB_BRANCH:-main}"
     local rel_path="${CFST_OUTPUT_FILE:-cf_ips.txt}"
-    local target="${CFST_WORK_DIR}/${rel_path}"
+    local target
     local msg="chore: update CF IPs $(date '+%Y-%m-%d %H:%M:%S')"
 
     setup_ssh || return 1
-    verify_git_repo || return 1
+    prepare_push_repo || return 1
 
-    git -C "$CFST_WORK_DIR" config user.email "cf-ips@qinglong.local"
-    git -C "$CFST_WORK_DIR" config user.name "cf-ips-bot"
+    target="${PUSH_REPO_DIR}/${rel_path}"
+
+    git -C "$PUSH_REPO_DIR" config user.email "cf-ips@qinglong.local"
+    git -C "$PUSH_REPO_DIR" config user.name "cf-ips-bot"
 
     echo "[GIT] 同步远程分支 ..."
-    git -C "$CFST_WORK_DIR" pull --rebase origin "$branch" 2>/dev/null || true
+    git -C "$PUSH_REPO_DIR" pull --rebase origin "$branch" 2>/dev/null || true
 
     mkdir -p "$(dirname "$target")"
     cp -f "$output_file" "$target"
 
-    git -C "$CFST_WORK_DIR" add "$rel_path"
+    git -C "$PUSH_REPO_DIR" add "$rel_path"
 
-    if git -C "$CFST_WORK_DIR" diff --cached --quiet; then
+    if git -C "$PUSH_REPO_DIR" diff --cached --quiet; then
         echo "[GIT] 内容无变化，跳过 push"
         return 0
     fi
 
-    git -C "$CFST_WORK_DIR" commit -m "$msg" || return 1
-    git -C "$CFST_WORK_DIR" push origin "$branch" || return 1
+    git -C "$PUSH_REPO_DIR" commit -m "$msg" || return 1
+    git -C "$PUSH_REPO_DIR" push origin "$branch" || return 1
 
     echo "[GIT] 已 push 到 origin/${branch}:${rel_path}"
 }

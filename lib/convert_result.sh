@@ -5,6 +5,7 @@ convert_result() {
     local csv_file="$1"
     local output_file="$2"
     local append_mode="${3:-false}"
+    local max_count="${4:-0}"
     local enable_download="${CFST_ENABLE_DOWNLOAD:-true}"
     local line_count=0
 
@@ -18,6 +19,10 @@ convert_result() {
     fi
 
     while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$max_count" =~ ^[0-9]+$ ]] && [[ "$max_count" -gt 0 ]] && [[ "$line_count" -ge "$max_count" ]]; then
+            break
+        fi
+
         # 跳过表头
         [[ "$line" == *"IP 地址"* || "$line" == *"IP,"* ]] && continue
         [[ -z "$line" ]] && continue

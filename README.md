@@ -50,7 +50,7 @@
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `GITHUB_SSH_KEY` | 是 | Deploy Key 私钥完整内容 |
-| `GITHUB_REPO` | 否 | 默认使用订阅仓库；可填 `user/repo` 或 SSH 地址 |
+| `GITHUB_REPO` | 建议填 | 可填 `user/repo` 或 SSH 地址；当青龙执行目录不含 `.git` 时为必填（脚本会自动克隆临时仓库后 push） |
 | `GITHUB_BRANCH` | 否 | 默认 `main` |
 | `CFST_VERSION` | 否 | 固定版本如 `v2.3.5`；留空用 latest |
 | `CFST_COLO` | 否 | 地区码，如 `HKG,LAX,SEA`（需 HTTPing） |

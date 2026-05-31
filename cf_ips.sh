@@ -81,7 +81,7 @@ main() {
                 fail_with_notify "CF IP 优选失败" "${region_name} 测速失败，请检查日志"
             fi
 
-            if convert_result "$CFST_RESULT_CSV" "$tmp_output" "false"; then
+            if convert_result "$CFST_RESULT_CSV" "$tmp_output" "false" "$count"; then
                 cat "$tmp_output" >> "$merged_output"
             else
                 echo "[WARN] ${region_name} 未获取到可用 IP"
@@ -103,7 +103,7 @@ main() {
             fail_with_notify "CF IP 优选失败" "CloudflareSpeedTest 执行失败，请检查日志"
         fi
 
-        if ! convert_result "$CFST_RESULT_CSV" "$tmp_output"; then
+        if ! convert_result "$CFST_RESULT_CSV" "$tmp_output" "false" "${CFST_IP_COUNT:-10}"; then
             fail_with_notify "CF IP 优选无结果" "测速完成但未找到符合条件的 IP，请放宽 CFST_COLO 或测速条件"
         fi
     fi
