@@ -59,6 +59,7 @@ main() {
     local deduped_output="${CFST_BIN_DIR}/.deduped.txt"
     local total_count=0
     local region_plan
+    local no_result_msg="本次测速无结果，任务已结束（未更新 GitHub 文件）"
 
     echo "========== CF IP 优选开始 $(date '+%Y-%m-%d %H:%M:%S') =========="
 
@@ -73,8 +74,26 @@ main() {
             region_file_tag="$(echo "$region_tag" | sed 's/[^A-Za-z0-9._-]/_/g')"
             echo "[PLAN] ${region_tag}: ${count} 个（${colo}）"
 
-            if ! run_cfst_once "$colo" "$count" "${CFST_BIN_DIR}/result_${region_file_tag}.csv"; then
-                fail_with_notify "CF IP 优选失败" "${region_tag} 测速失败，请检查日志"
+            local run_rc=0
+            if run_cfst_once "$colo" "$count" "${CFST_BIN_DIR}/result_${region_file_tag}.csv"; then
+                run_rc=0
+            else
+                run_rc=$?
+            fi
+            case $run_rc in
+                0) ;;
+                2)
+                    echo "[WARN] ${region_tag} 无可用结果，跳过该区域"
+                    continue
+                    ;;
+                *)
+                    fail_with_notify "CF IP 优选失败" "${region_tag} 测速失败，请检查日志"
+                    ;;
+            esac
+
+            if [[ ! -s "${CFST_RESULT_CSV}" ]]; then
+                echo "[WARN] ${region_tag} 结果文件为空，跳过该区域"
+                continue
             fi
 
             if convert_result "$CFST_RESULT_CSV" "$tmp_output" "false" "$count" "$region_tag"; then
@@ -85,7 +104,9 @@ main() {
         done <<< "$region_plan"
 
         if [[ ! -s "$merged_output" ]]; then
-            fail_with_notify "CF IP 优选无结果" "按地区测速完成，但未找到符合条件的 IP，请调整地区码或数量"
+            echo "[INFO] ${no_result_msg}"
+            send_notification "CF IP 优选无结果" "按区域测速完成但未找到可用 IP，任务正常结束"
+            exit 0
         fi
 
         dedupe_by_ip "$merged_output" "$deduped_output"
@@ -95,12 +116,28 @@ main() {
         export CFST_RESULT_COUNT
     else
         # 兼容单次测速模式
-        if ! run_cfst; then
-            fail_with_notify "CF IP 优选失败" "CloudflareSpeedTest 执行失败，请检查日志"
+        local run_single_rc=0
+        if run_cfst; then
+            run_single_rc=0
+        else
+            run_single_rc=$?
         fi
+        case $run_single_rc in
+            0) ;;
+            2)
+                echo "[INFO] ${no_result_msg}"
+                send_notification "CF IP 优选无结果" "单次测速无可用 IP，任务正常结束"
+                exit 0
+                ;;
+            *)
+                fail_with_notify "CF IP 优选失败" "CloudflareSpeedTest 执行失败，请检查日志"
+                ;;
+        esac
 
         if ! convert_result "$CFST_RESULT_CSV" "$tmp_output" "false" "${CFST_IP_COUNT:-10}" "${CFST_REGION_TAG:-}"; then
-            fail_with_notify "CF IP 优选无结果" "测速完成但未找到符合条件的 IP，请放宽 CFST_COLO 或测速条件"
+            echo "[INFO] ${no_result_msg}"
+            send_notification "CF IP 优选无结果" "测速完成但未找到符合条件的 IP，任务正常结束"
+            exit 0
         fi
     fi
 

@@ -119,8 +119,8 @@ run_cfst_once() {
     (cd "$CFST_BIN_DIR" && "$CFST_BIN" "${args[@]}") || return 1
 
     if [[ ! -f "$csv_file" ]]; then
-        echo "[CFST] 未生成结果文件 result.csv" >&2
-        return 1
+        echo "[CFST] 未生成结果文件: $csv_file（通常表示该区域无可用 IP）" >&2
+        return 2
     fi
 
     CFST_RESULT_CSV="$csv_file"

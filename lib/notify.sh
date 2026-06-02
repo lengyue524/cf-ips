@@ -11,7 +11,11 @@ send_notification() {
             "/ql/scripts/sendNotify.js" \
             "${SCRIPT_DIR}/sendNotify.js"; do
             if [[ -f "$notify_script" ]]; then
-                node "$notify_script" "$title" "$content" 2>/dev/null && return 0
+                if command -v timeout >/dev/null 2>&1; then
+                    timeout 20s node "$notify_script" "$title" "$content" 2>/dev/null && return 0
+                else
+                    node "$notify_script" "$title" "$content" 2>/dev/null && return 0
+                fi
             fi
         done
     fi
